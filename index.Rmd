@@ -1,0 +1,153 @@
+---
+title: "Larceny/theft-related incidents dominate crime in Central San Francisco, are also the most common in every district, with the Southern District dominating the number of overall theft-related incidents."
+author: "Olgierd Grodzki"
+output: html_document
+---
+
+# Overview
+
+In this project, we will be looking at the SFPD Incidents data set to explore how incidents vary by neighborhood in San Francisco. We will try to answer the following questions:
+
+- How do incidents vary by neighborhood?
+- Which incidents are most common in the city center?
+- In what areas or neighborhoods are robberies or thefts most common?
+
+The data set contains real crime data from Summer 2014 in San Francisco. The full data set can be found [here](https://data.sfgov.org/Public-Safety/SFPD-Incidents-from-1-January-2003/tmnf-yvry) and the San Francisco Data Portal can be found [here](https://data.sfgov.org/).
+
+# Data exploration
+
+First, we need to load the data set and explore its structure.
+
+```{r}
+data = read.csv("sanfrancisco_incidents_summer_2014.csv")
+head(data)
+```
+
+Looking at the structure of the data we can see that we will be interested in 2 variables in this data: 
+
+- Category, which contains the information about the incidents,
+- PdDistrict, which is an assumed approximation of the 'neighborhood'.
+
+The Category variable contains values from the following set:
+```{r}
+unique(data$Category)
+```
+
+In the context of the third question, we will define 'robberies or thefts' as the following subset of this set:
+```{r}
+thefts = factor(c("LARCENY/THEFT","VEHICLE THEFT","ROBBERY","BURGLARY","STOLEN PROPERTY"))
+```
+
+The PdDistrict variable contains values from the following set:
+```{r}
+unique(data$PdDistrict)
+```
+
+In the context of the second question, we will define 'city center' as the following subset of this set:
+```{r}
+city_center = factor(c("CENTRAL"))
+```
+
+# Data visualization
+
+## How do incidents vary by neighborhood?
+
+Since the data set contains information about 34 different incidents, plotting all of them for every neighbourhood would not produce a comprehensible plot. Therefore we will subset the data so that only 5 most common incidents per neighborhood will be displayed.
+
+```{r}
+library(plyr)
+
+# create an empty data frame to hold new data
+most_common_categories_data = data.frame(x=character(0), y=character(0), z=integer(0))
+names(most_common_categories_data) = c("District","Category","Count")
+
+# split the data by districts
+split_data = split(data, data$PdDistrict)
+
+# populate new data frame with 5 most common categories for every district, with counts
+n = 5
+for (sdata in split_data){
+    category_counts = count(sdata$Category)
+    most_common_categories = arrange(category_counts,desc(category_counts$freq))[1:n,]
+    tmp = cbind(sdata$PdDistrict[1:n],most_common_categories)
+    names(tmp) = c("District","Category","Count")
+    most_common_categories_data = rbind(most_common_categories_data,tmp)
+}
+```
+
+The new data has the following structure:
+```{r}
+head(most_common_categories_data)
+```
+
+We can now visualize the data to show how do 5 most common categories of crimes vary between districts:
+
+```{r fig.width=10, fig.height=7}
+library(ggplot2)
+ggplot(data=most_common_categories_data, aes(x=factor(1), y=Count, fill=Category)) +
+  geom_bar(stat="identity", position="fill") +
+  coord_polar(theta="y") +
+  facet_wrap(ncol=4,~District) + 
+  scale_fill_brewer(palette="Set1") +
+  labs(title = "Five most common crimes for every neighborhood")
+```
+
+Analyzing the plot we can see how the five most common incidents change between neighborhoods. The data visualization lets us easily see for example that incidents from the LARCENY/THEFT category are the most common in every neighborhood.
+
+## Which incidents are most common in the city center?
+
+To answer this question we will use the new data set created in the previous question. We can plot the 5 most common incidents for the city center:
+
+```{r fig.width=9, fig.height=6}
+ggplot(data=most_common_categories_data[most_common_categories_data$District %in% city_center,], aes(x=Category,y=Count)) + 
+    geom_bar(fill="darkred", stat="identity") + 
+    labs(title = "Five most common crimes for the city center")
+```
+
+Analyzing the plot we can see not only which indicents are most common (which we could tell by just analyzing the 'table' data), but we can also easily see how the LARCENY/THEFT category is dominating the most common incidents.
+
+## In what areas or neighborhoods are robberies or thefts most common?
+
+To answer this question we will create a new data set summing the counts of theft-related incidents.
+
+
+```{r}
+theft_categories_data = data.frame(x=character(0), y=character(0), z=integer(0))
+names(theft_categories_data) = c("District","Sum")
+
+for (sdata in split_data){
+    category_counts = count(sdata$Category)
+    theft_categories_sum = sum(category_counts[category_counts$x %in% thefts,]$freq)
+    tmp = data.frame(sdata$PdDistrict[[1]],theft_categories_sum)
+    names(tmp) = c("District","Sum")
+    theft_categories_data = rbind(theft_categories_data,tmp)
+}
+```
+
+We can now visualize the data to show how does the number of theft-related incidents vary between districts:
+
+```{r fig.width=9, fig.height=6}
+ggplot(data=theft_categories_data, aes(x=District,y=Sum)) + 
+    geom_bar(fill="darkred",stat="identity") + 
+    labs(title = "Number of theft-related incidents per district")
+```
+
+Analyzing the plot we can see that theft-related incidents are most common in the Southern District, then the Central and Northern District, and then the rest.
+
+# Summary
+
+In this project we have visualized the data to provide answers to the following questions:
+
+- How do incidents vary by neighborhood?
+
+By analyzing the plot we can say that while the incident categories definitely vary between neighborhoods, the most common category in all of them is the LARCENY/THEFT category. Analyzing the plot also reveals which categories of incidents are most common for every district.
+
+- Which incidents are most common in the city center?
+
+By analyzing the plot we can see not only that incidents from the LARCENY/THEFT category are the most common, but also that thwy dominate among other common categories. We can of course also see which categories are next.
+
+- In what areas or neighborhoods are robberies or thefts most common?
+
+By analyzing the plot we can see that theft-related incidents are most common in the Southern District, then the Central and Northern District, and then the rest.
+
+Finally, we can connect these findings together to formulate the primary finding, which is that incidents from the LARCENY/THEFT category dominate crime in the Central District of San Francisco, they are also the most common in every district, with the Southern District dominating the number of overall theft-related incidents.
